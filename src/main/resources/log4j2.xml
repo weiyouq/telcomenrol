@@ -2,7 +2,7 @@
 <Configuration>
     <Appenders>
         <RollingFile name="RollingFile"
-                     fileName="logs/${date:yyyy-MM-dd}/output-{yyyy-MM-dd}.log"
+                     fileName="logs/${date:yyyy-MM-dd}/output-${yyyy-MM-dd}.log"
                      filePattern="logs/${date:yyyy-MM-dd}/output-%d{yyyy-MM-dd}-%i.log">
             <PatternLayout>
                 <Pattern>%d %p %C:%L - %m%n</Pattern>
