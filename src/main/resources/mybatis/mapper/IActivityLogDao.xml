@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.telcom.enrol.dao.IActivityLogDao">
+  <resultMap id="BaseResultMap" type="cn.telcom.enrol.bean.ActivityLog">
+    <id column="id" jdbcType="BIGINT" property="id" />
+    <result column="user_id" jdbcType="BIGINT" property="userId" />
+    <result column="bu_id" jdbcType="BIGINT" property="buId" />
+    <result column="voice_location" jdbcType="VARCHAR" property="voiceLocation" />
+    <result column="category" jdbcType="INTEGER" property="category" />
+    <result column="create_date" jdbcType="TIMESTAMP" property="createDate" />
+    <result column="result" jdbcType="VARCHAR" property="result" />
+  </resultMap>
+  <sql id="Base_Column_List">
+    id, user_id, bu_id, voice_location, category, create_date, result
+  </sql>
+  <select id="selectByPrimaryKey" parameterType="java.lang.Long" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from t_activity_log
+    where id = #{id,jdbcType=BIGINT}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Long">
+    delete from t_activity_log
+    where id = #{id,jdbcType=BIGINT}
+  </delete>
+  <insert id="insert" parameterType="cn.telcom.enrol.bean.ActivityLog">
+    <selectKey keyProperty="id" order="AFTER" resultType="java.lang.Long">
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_activity_log (user_id, bu_id, voice_location, 
+      category, create_date, result
+      )
+    values (#{userId,jdbcType=BIGINT}, #{buId,jdbcType=BIGINT}, #{voiceLocation,jdbcType=VARCHAR}, 
+      #{category,jdbcType=INTEGER}, #{createDate,jdbcType=TIMESTAMP}, #{result,jdbcType=VARCHAR}
+      )
+  </insert>
+  <insert id="insertSelective" parameterType="cn.telcom.enrol.bean.ActivityLog">
+    <selectKey keyProperty="id" order="AFTER" resultType="java.lang.Long">
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_activity_log
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="userId != null">
+        user_id,
+      </if>
+      <if test="buId != null">
+        bu_id,
+      </if>
+      <if test="voiceLocation != null">
+        voice_location,
+      </if>
+      <if test="category != null">
+        category,
+      </if>
+      <if test="createDate != null">
+        create_date,
+      </if>
+      <if test="result != null">
+        result,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="userId != null">
+        #{userId,jdbcType=BIGINT},
+      </if>
+      <if test="buId != null">
+        #{buId,jdbcType=BIGINT},
+      </if>
+      <if test="voiceLocation != null">
+        #{voiceLocation,jdbcType=VARCHAR},
+      </if>
+      <if test="category != null">
+        #{category,jdbcType=INTEGER},
+      </if>
+      <if test="createDate != null">
+        #{createDate,jdbcType=TIMESTAMP},
+      </if>
+      <if test="result != null">
+        #{result,jdbcType=VARCHAR},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="cn.telcom.enrol.bean.ActivityLog">
+    update t_activity_log
+    <set>
+      <if test="userId != null">
+        user_id = #{userId,jdbcType=BIGINT},
+      </if>
+      <if test="buId != null">
+        bu_id = #{buId,jdbcType=BIGINT},
+      </if>
+      <if test="voiceLocation != null">
+        voice_location = #{voiceLocation,jdbcType=VARCHAR},
+      </if>
+      <if test="category != null">
+        category = #{category,jdbcType=INTEGER},
+      </if>
+      <if test="createDate != null">
+        create_date = #{createDate,jdbcType=TIMESTAMP},
+      </if>
+      <if test="result != null">
+        result = #{result,jdbcType=VARCHAR},
+      </if>
+    </set>
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="cn.telcom.enrol.bean.ActivityLog">
+    update t_activity_log
+    set user_id = #{userId,jdbcType=BIGINT},
+      bu_id = #{buId,jdbcType=BIGINT},
+      voice_location = #{voiceLocation,jdbcType=VARCHAR},
+      category = #{category,jdbcType=INTEGER},
+      create_date = #{createDate,jdbcType=TIMESTAMP},
+      result = #{result,jdbcType=VARCHAR}
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+</mapper>

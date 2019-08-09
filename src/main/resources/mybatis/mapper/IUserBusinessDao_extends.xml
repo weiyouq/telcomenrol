@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.telcom.enrol.dao.IUserBusinessDao">
+  <select id="selectUserByUserIdAndBuId" resultMap="BaseResultMap">
+    select id, user_id, bu_id
+    from t_user_business
+    where user_id = #{userID} AND bu_id = #{buID}
+  </select>
+</mapper>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.telcom.enrol.dao.IUserDao">
+  <select id="selectUserByNoAndEnrolCategory" resultMap="BaseResultMap">
+    select id, user_no, enrol_category, verify_no, vp_count
+    from t_user
+    where
+    user_no=#{userNo} AND enrol_category =#{enrolCategory}
+  </select>
+</mapper>
