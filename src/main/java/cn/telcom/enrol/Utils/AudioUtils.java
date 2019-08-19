@@ -149,7 +149,11 @@ public class AudioUtils {
 	}
 
 	public static String byteArrayToBase64(byte[] data) {
-		return new BASE64Encoder().encode(data).replaceAll("(\r\n|\r|\n|\n\r)", "");
+		String encode = new BASE64Encoder().encode(data);
+		if (encode.contains("(\r\n|\r|\n|\n\r)")){
+			encode = encode.replaceAll("(\r\n|\r|\n|\n\r)", "");
+		}
+		return encode;
 	}
 
 	public static byte[] base64ToByteArray(String base64) {

@@ -11,6 +11,7 @@ import cn.telcom.enrol.dao.*;
 import cn.telcom.enrol.service.IEnrolService;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
+import org.apache.commons.collections.bag.SynchronizedSortedBag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +20,6 @@ import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.util.*;
-import static java.lang.System.out;
 
 /**
  * @author kenny_peng
@@ -59,7 +59,8 @@ public class EnrolServiceImpl implements IEnrolService {
 
     }
 
-    private final int MAX_THREAD_COUNT = 16;
+    @Value("${xs.max.thread.count}")
+    private int MAX_THREAD_COUNT;
 
     private volatile int completedThread = MAX_THREAD_COUNT;
     private synchronized int getCompletedThreadCount() {
@@ -95,10 +96,10 @@ public class EnrolServiceImpl implements IEnrolService {
         String nowDayFilePath = voiceSaveLocation + File.separator + FileUtils.formateDate("yyyyMMdd");
         File file = new File(nowDayFilePath);
         List<File> listFiles = FileUtils.getFileList(file);
+        logger.info("查询文件路径nowDayFilePath：" + nowDayFilePath + "------" + "得到的文件集合大小listFiles.size()：" + listFiles.size());
 
         List<String> alreadyEnroledList = activityLogDao.selectAlreadyEnroledList();
-        List<ResponseTemplate
-                > resultList = new ArrayList<>();
+        List<ResponseTemplate> resultList = new ArrayList<>();
         for (File singleFile : listFiles){
             if (!alreadyEnroledList.contains(singleFile.getPath())){
                 needToVBEnrolFiles.add(singleFile);
@@ -163,7 +164,6 @@ public class EnrolServiceImpl implements IEnrolService {
             map.put("error",error);
         }
         return map;
-//        System.out.println(System.currentTimeMillis() -l + "----------------------");
     }
 
     /**
@@ -229,12 +229,14 @@ public class EnrolServiceImpl implements IEnrolService {
     @Override
     public String identifyService(String filePath) {
         File file = new File(filePath);
-        if (file.isDirectory()){
+//        if (file.isDirectory()){
+        if (!file.isFile()){
             needToIdentifyEnrolFiles.clear();
             //如果filePath是一个目录，遍历得到所有文件
-//            List<File> files = new ArrayList<>();
             needToIdentifyEnrolFiles = FileUtils.getFileList(file);
-            if (needToIdentifyEnrolFiles.isEmpty()){
+            logger.info("查询文件路径filePath：" + filePath + "--------" + "得到的文件集合大小needToIdentifyEnrolFiles.size()：" + needToIdentifyEnrolFiles.size());
+
+            if (needToIdentifyEnrolFiles.size() == 0){
                 return JSONObject.fromObject(ResponseTemplate.error("选择目录为空，请重新选择!")).toString();
             }else {
                 Map<String, List<String>> map = new HashMap<>();
@@ -249,8 +251,6 @@ public class EnrolServiceImpl implements IEnrolService {
     }
 
     private String identifyEnrolSpeaker(String filePath) {
-
-        out.println("--------filePath----------"+filePath);
         String enrolBase64 = AudioUtils.audioToBase64(filePath);
         String fileName = new File(filePath).getName();
         String[] names = getUserArray(fileName);

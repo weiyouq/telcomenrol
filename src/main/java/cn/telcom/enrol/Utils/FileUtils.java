@@ -22,7 +22,7 @@ import java.util.Set;
  */
 public class FileUtils {
 
-    private static Logger logger = LoggerFactory.getLogger(FileUtils.class);
+    private static Logger   logger = LoggerFactory.getLogger(FileUtils.class);
 
     public static ResponseTemplate saveBase64(ReceiveVoiceInputObject inputObject, String voiceSaveLocation){
 
@@ -83,7 +83,7 @@ public class FileUtils {
         if (file.exists()) {
 
             //判断文件是否是文件夹，如果是，开始递归
-            if (file.isDirectory()) {
+            if (!file.isFile()) {
                 File f[] = file.listFiles();
                 for (File file2 : f) {
                     getAllFiles(file2, listFiles);
@@ -101,13 +101,14 @@ public class FileUtils {
         if (file.exists()) {
 
             //判断文件是否是文件夹，如果是，开始递归
-            if (file.isDirectory()) {
+            if (!file.isFile()) {
                 File f[] = file.listFiles();
                 for (File file2 : f) {
                     getAllFiles(file2, listFiles);
                 }
             }else {
                 listFiles.add(file);
+                logger.info("========="+file.getPath());
             }
         }
         return listFiles;

@@ -2,13 +2,13 @@
 <Configuration>
     <Appenders>
         <RollingFile name="RollingFile"
-                     fileName="logs/${date:yyyy-MM-dd}/output-${yyyy-MM-dd}.log"
-                     filePattern="logs/${date:yyyy-MM-dd}/output-%d{yyyy-MM-dd}-%i.log">
+                     fileName="logs/output.log"
+                     filePattern="logs/output-%i.log">
             <PatternLayout>
                 <Pattern>%d %p %C:%L - %m%n</Pattern>
             </PatternLayout>
             <Policies>
-                <SizeBasedTriggeringPolicy size="50 MB" />
+                <SizeBasedTriggeringPolicy size="50MB" />
             </Policies>
             <DefaultRolloverStrategy max="10" />
         </RollingFile>
