@@ -93,7 +93,7 @@ public class EnrolServiceImpl implements IEnrolService {
     public String toEnrolSpeaker() {
         needToVBEnrolFiles.clear();
         //1、根据音频存储路径，获取所有音频文件
-        String nowDayFilePath = voiceSaveLocation + File.separator + FileUtils.formateDate("yyyyMMdd");
+        String nowDayFilePath = voiceSaveLocation + File.separator + FileUtils.formateDate("yyyyMMdd") + File.separator;
         File file = new File(nowDayFilePath);
         List<File> listFiles = FileUtils.getFileList(file);
         logger.info("查询文件路径nowDayFilePath：" + nowDayFilePath + "------" + "得到的文件集合大小listFiles.size()：" + listFiles.size());
@@ -219,7 +219,6 @@ public class EnrolServiceImpl implements IEnrolService {
             needToIdentifyEnrolFiles.remove(0);
             return item;
         }
-
     }
 
     /**
@@ -508,23 +507,23 @@ public class EnrolServiceImpl implements IEnrolService {
         //返回正确结果
         if (enrolResultMap.containsKey("result")){
 
-//            //解析verifyResult，得到信噪比值
-//            Object o = JSONObject.fromObject(enrolResultMap.get("result")).get("metaInformation");
-//            JSONArray jsonArray = JSONArray.fromObject(o);
-//            String resultSnrScore = null;
-//            for (int i = 0; i<jsonArray.size(); i++){
-//                if (JSONObject.fromObject(jsonArray.getString(i)).get("key").equals("get-snr")){
-//                    resultSnrScore = (String) JSONObject.fromObject(JSONObject.fromObject(jsonArray.getString(i)).get("value")).get("value");
-//                }
-//            }
-//
-//            //如果信噪比分数低于阈值，返回错误
-//            if (Double.valueOf(resultSnrScore) < Double.valueOf(snrScore)){
-//                logger.error("分数低于阈值");
-//                return ResponseTemplate.error("分数低于阈值");
-//            }else {
+            //解析verifyResult，得到信噪比值
+            Object o = JSONObject.fromObject(enrolResultMap.get("result")).get("metaInformation");
+            JSONArray jsonArray = JSONArray.fromObject(o);
+            String resultSnrScore = null;
+            for (int i = 0; i<jsonArray.size(); i++){
+                if (JSONObject.fromObject(jsonArray.getString(i)).get("key").equals("get-snr")){
+                    resultSnrScore = (String) JSONObject.fromObject(JSONObject.fromObject(jsonArray.getString(i)).get("value")).get("value");
+                }
+            }
+
+            //如果信噪比分数低于阈值，返回错误
+            if (Double.valueOf(resultSnrScore) < Double.valueOf(snrScore)){
+                logger.error("分数低于阈值");
+                return ResponseTemplate.error("分数低于阈值");
+            }else {
                 return ResponseTemplate.ok("预注册成功");
-//            }
+            }
         }else {//返回错误结果
             return ResponseTemplate.error(enrolResult);
         }

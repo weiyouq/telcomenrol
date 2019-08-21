@@ -78,6 +78,14 @@
 			<version>2.1.6.RELEASE</version>
 			<scope>test</scope>
 		</dependency>
+
+		<!-- ftp相关工具包 -->
+		<dependency>
+			<groupId>commons-net</groupId>
+			<artifactId>commons-net</artifactId>
+			<version>3.6</version>
+		</dependency>
+
 	</dependencies>
 
 	<build>

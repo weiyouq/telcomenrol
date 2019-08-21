@@ -3,24 +3,34 @@ package cn.telcom.enrol.Utils;
 import com.sun.jna.Memory;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
+import org.apache.commons.lang.ArrayUtils;
 import sun.misc.BASE64Decoder;
 import sun.misc.BASE64Encoder;
 
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 public class AudioUtils {
 
 	public static void main(String[] args) {
-		String s = audioToBase64("f://cms/voice/20190805/1_1.wav");
+		String s = audioToBase64("f://cms/voice/33_23.pcm");
 		System.out.println(s);
+		Base64toAudio("f://cms//23.pcm.txt", "f://cms//1.wav");
 	}
 
 	public static String audioToBase64(String inPath) {
 
 		byte[] readAudioData = AudioUtils.readAudioData(inPath);
+		String byteArrayToBase64 = AudioUtils.byteArrayToBase64(readAudioData);
+		return byteArrayToBase64;
+	}
+
+	public static String pcmToBase64(InputStream inputStream){
+		byte[] readAudioData = readFile(inputStream);
 		String byteArrayToBase64 = AudioUtils.byteArrayToBase64(readAudioData);
 		return byteArrayToBase64;
 	}
@@ -49,7 +59,6 @@ public class AudioUtils {
 			if (skip > 0) {
 				in.skip(skip);
 			}
-
 			byte[] bytes = new byte[fileLength - skip];
 			int length = in.read(bytes);
 			return Arrays.copyOf(bytes, length);
@@ -63,6 +72,23 @@ public class AudioUtils {
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
+		}
+		return null;
+	}
+
+	public static byte[] readFile(InputStream in) {
+//		byte[] data = null;
+		// 读取图片字节数组
+		try {
+			ByteArrayOutputStream swapStream = new ByteArrayOutputStream();
+			byte[] buff = new byte[1024];
+			int rc = 0;
+			while ((rc = in.read(buff, 0, 1024)) > 0) {
+				swapStream.write(buff, 0, rc);
+			}
+			return swapStream.toByteArray();
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
 		return null;
 	}

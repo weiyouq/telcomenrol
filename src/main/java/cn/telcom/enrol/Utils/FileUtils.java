@@ -6,9 +6,7 @@ import cn.telcom.enrol.config.response.ResponseTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -114,4 +112,22 @@ public class FileUtils {
         return listFiles;
 
     }
+
+
+    private void stringToFile(String s){
+        FileWriter fw = null;
+        File f = new File("f:\\cms\\.txt");
+        try {
+            if(!f.exists()){
+                f.createNewFile();
+            }
+            fw = new FileWriter(f);
+            BufferedWriter out = new BufferedWriter(fw);
+            out.write(s, 0, s.length()-1);
+            out.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
 }
