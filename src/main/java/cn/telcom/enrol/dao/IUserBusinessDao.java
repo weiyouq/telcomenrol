@@ -8,4 +8,6 @@ import cn.telcom.enrol.bean.UserBusiness;
  */
 public interface IUserBusinessDao extends IBaseDao<Long, UserBusiness> {
     UserBusiness selectUserByUserIdAndBuId(Long userID, Integer buID);
+
+    int deleteByUserIdAndBuId(Long userID, Integer buID);
 }

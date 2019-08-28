@@ -14,6 +14,12 @@ public class User {
     public User(){
 
     }
+
+    public User(Long id, Integer vpCount) {
+        this.id = id;
+        this.vpCount = vpCount;
+    }
+
     public User(String userNo, Integer enrolCategory, String verifyNo, Integer vpCount) {
         this.userNo = userNo;
         this.enrolCategory = enrolCategory;

@@ -2,10 +2,7 @@ package cn.telcom.enrol.Utils;
 
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
-import org.apache.commons.net.ftp.FTP;
-import org.apache.commons.net.ftp.FTPClient;
-import org.apache.commons.net.ftp.FTPFile;
-import org.apache.commons.net.ftp.FTPReply;
+import org.apache.commons.net.ftp.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,7 +43,7 @@ public class ContinueFTP2{
     }
 
     public FTPClient ftpClient = new FTPClient();
-    private Logger logger = LoggerFactory.getLogger(FTPUtil.class);
+    private Logger logger = LoggerFactory.getLogger(ContinueFTP2.class);
 
     private String ftpURL,username,pwd,ftpport,file1,file2;
     public ContinueFTP2(String _ftpURL, String _username, String _pwd, String _ftpport, String _file1){
@@ -73,6 +70,10 @@ public class ContinueFTP2{
     public boolean connect(String hostname,int port,String username,String password) throws IOException{
         ftpClient.connect(hostname, port);
         ftpClient.setControlEncoding("UTF-8");
+
+        //由于apache不支持中文语言环境，通过定制类解析中文日期类型
+//        ftpClient.configure(new FTPClientConfig("org.apache.commons.net.ftp.parser.UnixFTPEntryParser"));
+
         if(FTPReply.isPositiveCompletion(ftpClient.getReplyCode())){
             if(ftpClient.login(username, password)){
                 return true;
@@ -88,62 +89,69 @@ public class ContinueFTP2{
      * @return 上传的状态
      * @throws IOException
      */
-    public Map<String,String> download(String remote) throws IOException{
+    public Map<String,String> download(String remote){
         Map<String,String> resultMap = new HashMap<>();
-        //设置被动模式     
-        ftpClient.enterLocalPassiveMode();
-        //设置以二进制方式传输     
-        ftpClient.setFileType(FTP.BINARY_FILE_TYPE);
-        DownloadStatus result;
+        try {
+            //设置被动模式
+            ftpClient.enterLocalPassiveMode();
+            //设置以二进制方式传输
+            ftpClient.setFileType(FTP.BINARY_FILE_TYPE);
+            DownloadStatus result;
 
-        //检查远程文件是否存在     
-        FTPFile[] files = ftpClient.listFiles(remote);
-        if(files.length != 1){
-            System.out.println("远程文件不存在" + remote);
-            resultMap.put("code","404");
-            resultMap.put("msg", DownloadStatus.Remote_File_Noexist.toString());
-            return resultMap;
-        }
+            //检查远程文件是否存在
+            FTPFile[] files = ftpClient.listFiles(remote);
+            if(files.length != 1){
+                System.out.println("远程文件不存在" + remote);
+                resultMap.put("code","404");
+                resultMap.put("msg", DownloadStatus.Remote_File_Noexist.toString());
+                return resultMap;
+            }
 
-        //下载文件
-        InputStream in= ftpClient.retrieveFileStream(new String(remote.getBytes("UTF-8"),"iso-8859-1"));
+            //下载文件
+            InputStream in= ftpClient.retrieveFileStream(new String(remote.getBytes("UTF-8"),"iso-8859-1"));
 
-        //得到下载音频的base64
-        String base64 = AudioUtils.pcmToBase64(in);
-
-
-        in.close();
-        boolean base64Result = ftpClient.completePendingCommand();
-
-        //得到手机号
-        String json = remote.substring(0, remote.lastIndexOf(".down.pcm")) + ".json";
-        System.out.println("remote="+ json);
-        InputStream inJSON= ftpClient.retrieveFileStream(json);
-        ByteArrayOutputStream swapStream = new ByteArrayOutputStream();
-        byte[] buff = new byte[1024];
-        int rc = 0;
-        while ((rc = inJSON.read(buff, 0, 1024)) > 0) {
-            swapStream.write(buff, 0, rc);
-        }
-        byte[] bytes = swapStream.toByteArray();
-        Map<String,String> map = JSONObject.fromObject(new String(bytes));
-        String callerid = map.get("callerid");//手机号
+            //得到下载音频的base64
+            String base64 = AudioUtils.pcmToBase64(in);
 
 
-        inJSON.close();
-        boolean jsonResult = ftpClient.completePendingCommand();
+            in.close();
+            boolean base64Result = ftpClient.completePendingCommand();
+
+            //得到手机号
+            String json = remote.substring(0, remote.lastIndexOf(".down.pcm")) + ".json";
+//            System.out.println("remote="+ json);
+            InputStream inJSON= ftpClient.retrieveFileStream(json);
+            ByteArrayOutputStream swapStream = new ByteArrayOutputStream();
+            byte[] buff = new byte[1024];
+            int rc = 0;
+            while ((rc = inJSON.read(buff, 0, 1024)) > 0) {
+                swapStream.write(buff, 0, rc);
+            }
+            byte[] bytes = swapStream.toByteArray();
+            Map<String,String> map = JSONObject.fromObject(new String(bytes));
+            String callerid = map.get("callerid");//手机号
 
 
-        //成功complete则返回base64和手机号
-        if(jsonResult && base64Result){
+            inJSON.close();
+            boolean jsonResult = ftpClient.completePendingCommand();
 
-            resultMap.put("code","0");
-            resultMap.put("base64", base64);
-            resultMap.put("callerid", callerid);
-            return resultMap;
-        }else {
+
+            //成功complete则返回base64和手机号
+            if(jsonResult && base64Result){
+
+                resultMap.put("code","0");
+                resultMap.put("base64", base64);
+                resultMap.put("callerid", callerid);
+                return resultMap;
+            }else {
+                resultMap.put("code", "500");
+                resultMap.put("msg", DownloadStatus.Download_New_Failed.toString());
+                return resultMap;
+            }
+        } catch (IOException e) {
+            logger.error("下载文件路径为："+ remote +"的文件出错",e);
             resultMap.put("code", "500");
-            resultMap.put("msg", DownloadStatus.Download_New_Failed.toString());
+            resultMap.put("msg", "下载文件路径为："+ remote +"的文件出错");
             return resultMap;
         }
     }
@@ -317,22 +325,28 @@ public class ContinueFTP2{
      * @param ftpDirPath    FTP上的目标文件路径
      */
     public List<String> getFileNameListFromFTP(String ftpDirPath) {
+
+//        System.out.println("ftpDirPath="+ftpDirPath);
         List<String> stringList = new ArrayList<>();
         try {
+//            logger.info("----------ftpDirPath------" + ftpDirPath + "---" + ftpDirPath.startsWith("/") + ftpDirPath.endsWith("/") + "---" + ftpDirPath.substring(ftpDirPath.length()-1,ftpDirPath.length()) + "---" + ftpDirPath.substring(0,1));
             if (ftpDirPath.startsWith("/") && ftpDirPath.endsWith("/")) {
+
                 // 通过提供的文件路径获取FTPFile对象列表
+                //先调用这个方法,这个方法的意思就是每次数据连接之前，ftp client告诉ftp server开通一个端口来传输数据。
+                //因为ftp server可能每次开启不同的端口来传输数据，但是在linux上，由于安全限制，可能某些端口没有开启，所以就出现阻塞。
+                ftpClient.enterLocalPassiveMode();
                 FTPFile[] files = ftpClient.listFiles(ftpDirPath);
                 // 遍历文件列表，打印出文件名称
                 for (int i = 0; i < files.length; i++) {
                     FTPFile ftpFile = files[i];
                     // 此处只打印文件，未遍历子目录（如果需要遍历，加上递归逻辑即可）
-                    if (ftpFile.isFile()) {
-//                        logger.info(ftpDirPath + ftpFile.getName());
+                    if (!ftpFile.isDirectory()) {
                         if (ftpFile.getName().endsWith(".down.pcm")) {
                             stringList.add(ftpDirPath + ftpFile.getName());
                         }
                     }else {
-                        List<String> strings = getFileNameListFromFTP(ftpDirPath + "/" + ftpFile.getName() + "/");
+                        List<String> strings = getFileNameListFromFTP(ftpDirPath + ftpFile.getName() + "/");
                         stringList.addAll(strings);
                     }
                 }
@@ -364,7 +378,7 @@ public class ContinueFTP2{
             Thread t = new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    new ContinueFTP2("192.168.18.186", "anonymous", null, "21", s).run();
+                    Map<String, String> stringMap = new ContinueFTP2("192.168.18.186", "anonymous", null, "21", s).run();
                 }
             });
             threadVector.add(t);

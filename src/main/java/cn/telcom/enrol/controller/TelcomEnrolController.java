@@ -1,7 +1,7 @@
 package cn.telcom.enrol.controller;
 
-import cn.telcom.enrol.bean.ReceiveVoiceInputObject;
-import cn.telcom.enrol.config.response.ResponseTemplate;
+import cn.telcom.enrol.Utils.AudioUtils;
+import cn.telcom.enrol.Utils.ContinueFTP2;
 import cn.telcom.enrol.service.IEnrolService;
 import net.sf.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,10 +11,10 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.validation.Valid;
-import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.InputStream;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -49,6 +49,4 @@ public class TelcomEnrolController {
     public String identifyService(@RequestBody String path, HttpServletRequest request, HttpServletResponse response) throws IOException {
         return iEnrolService.identifyService(path);
     }
-
-
 }

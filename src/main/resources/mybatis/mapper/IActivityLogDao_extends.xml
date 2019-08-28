@@ -50,6 +50,14 @@
       </trim>
 
     </foreach>
-
   </insert>
+  <select id="selectIfTodayEnrolled" resultMap="BaseResultMap">
+    SELECT
+      id, user_id, bu_id, voice_location, category, create_date, result
+    FROM
+      t_activity_log
+    WHERE user_id =#{id} AND category=1 AND DATE_FORMAT(create_date ,'%Y%m%d') = #{date}
+  </select>
+
+
 </mapper>

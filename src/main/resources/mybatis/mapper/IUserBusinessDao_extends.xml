@@ -6,4 +6,8 @@
     from t_user_business
     where user_id = #{userID} AND bu_id = #{buID}
   </select>
+  <delete id="deleteByUserIdAndBuId">
+    delete from t_user_business where user_id =#{userID} and bu_id =#{buID}
+
+  </delete>
 </mapper>

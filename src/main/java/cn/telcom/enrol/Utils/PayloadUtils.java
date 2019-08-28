@@ -14,11 +14,11 @@ public class PayloadUtils {
 
     private static String type_application = "text-independent";
     private static String mode_application = "ti_plp2covv2";
-    private static String samplingRate_application = "16000";
+    private static String samplingRate_application = "8000";
     private static String format_application = "pcm16";
 
     private static String format = "pcm16";
-    private static String samplingRate = "16000";
+    private static String samplingRate = "8000";
 
     /**
      * 生成注册用payload
@@ -109,7 +109,7 @@ public class PayloadUtils {
 
         // processingInformation_metaInformation_detect-replay-v2-16k
         JSONObject jsonObject_pro_met_det = new JSONObject();
-        jsonObject_pro_met_det.put("key", "detect-replay-v2-16k");
+        jsonObject_pro_met_det.put("key", "detect-replay-v2-8k");
 
         // processingInformation_metaInformation_detect-replay-v2-16k_value
         JSONObject jsonObject_pro_met_det_val = new JSONObject();

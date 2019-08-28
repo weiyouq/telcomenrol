@@ -18,8 +18,12 @@ public class ActivityLog {
     private String result;
 
     public ActivityLog(Long userId, Integer buId, String voiceLocation, Integer category, Date createDate, String result) {
+
         this.userId = userId;
-        this.buId = buId;
+        if (buId != null){
+            this.buId = buId;
+        }
+
         this.voiceLocation = voiceLocation;
         this.category = category;
         this.createDate = createDate;

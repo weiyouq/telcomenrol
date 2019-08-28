@@ -43,7 +43,7 @@
       <if test="userId != null">
         user_id,
       </if>
-      <if test="buId != null">
+      <if test="buId != null and buId != 0">
         bu_id,
       </if>
       <if test="voiceLocation != null">
@@ -63,7 +63,7 @@
       <if test="userId != null">
         #{userId,jdbcType=BIGINT},
       </if>
-      <if test="buId != null">
+      <if test="buId != null  and buId != 0">
         #{buId,jdbcType=BIGINT},
       </if>
       <if test="voiceLocation != null">

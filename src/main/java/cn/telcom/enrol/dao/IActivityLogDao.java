@@ -20,4 +20,7 @@ public interface IActivityLogDao extends IBaseDao<Long, ActivityLog>{
     int insertByList(List<ActivityLog> list);
 
     int insertByUserNoAndBuNo(String name, String name1);
+
+    List<ActivityLog> selectIfTodayEnrolled(Long id, String date);
+
 }
