@@ -38,11 +38,14 @@ public class EnrolServiceImpl implements IEnrolService {
     private String enrolUrl;
     @Value("${xs.vb.verify.address}")
     private String verifyUrl;
+    @Value("${xs.vb.delete.address}")
+    private String deleteUrl;
 
     @Value("${xs.get.snr.score}")
     private String snrScore;
     @Value("${xs.vb.verify.score}")
     private String verifyScore;
+
     @Value("${xs.identity.enrol.address}")
     private String identifyEnrolAddress;
 
@@ -271,68 +274,59 @@ public class EnrolServiceImpl implements IEnrolService {
             if (names != null){
 
                 //1、先进性1对1验证，判断性噪比
-//                ResponseTemplate passSNR = isPassSNR("log-" + FileUtils.formateDate("yyyyMMddHHmmssSSS"), stringMap.get("callerid"), enrolBase64);//log日志名)
-//                if ((Integer) passSNR.get("code") == 0){
-
-
-
-
-
-
-
-
+                ResponseTemplate passSNR = isPassSNR("log-" + FileUtils.formateDate("yyyyMMddHHmmssSSS"), stringMap.get("callerid"), enrolBase64);//log日志名)
+                if ((Integer) passSNR.get("code") == 0){
                     String enrolPayload = PayloadUtils.identifyPayload(names[0], enrolBase64);
                     String enrolResult = PostRequest.sendPost(getUseUrl(identifyEnrolAddress), enrolPayload);
 
-                    User user = userDao.selectUserByNoAndEnrolCategory(names[0], 1);
-                    boolean booleanUserBuNo = names[1].equals("null");
-                    Business business = businessDao.selectByBuNo(names[1]);
-                    int buID;
+                    //先判断是否注册成功
+                    Integer retCode = (Integer) JSONObject.fromObject(enrolResult).get("retCode");
+                    if (retCode == 0){
+                        User user = userDao.selectUserByNoAndEnrolCategory(names[0], 1);
+                        boolean booleanUserBuNo = names[1].equals("null");
+                        Business business = businessDao.selectByBuNo(names[1]);
+                        int buID;
 
-                    long userID;//= user.getId();
-                    if (user == null){
-                        User newUser = new User(names[0],1,null,null);
-                        userDao.insertSelective(newUser);
-                        userID = newUser.getId();
+                        long userID;//= user.getId();
+                        if (user == null){
+                            User newUser = new User(names[0],1,null,null);
+                            userDao.insertSelective(newUser);
+                            userID = newUser.getId();
+                            if (!booleanUserBuNo){
+                                if (business == null){
+                                    Business newBusiness = new Business(names[1]);
+                                    businessDao.insertSelective(newBusiness);
+                                    business = newBusiness;
+                                }
+                            }
+                        }else {
+                            userID = user.getId();
+                        }
                         if (!booleanUserBuNo){
-                            if (business == null){
-                                Business newBusiness = new Business(names[1]);
-                                businessDao.insertSelective(newBusiness);
-                                business = newBusiness;
+                            UserBusiness userBusiness = userBusinessDao.selectUserByUserIdAndBuId(userID, business.getId());
+                            if (userBusiness == null){
+                                userBusinessDao.insertSelective(new UserBusiness(userID,business.getId()));
                             }
                         }
+                        recordEnrolledLog(business, userID, filePath, Const.IDENTIFY_ENROL, new Date(), enrolResult);
                     }else {
-                        userID = user.getId();
+                        recordEnrolledLog(null, null, filePath, Const.IDENTIFY_ENROL_FAILED, new Date(), enrolResult);
                     }
-                    if (!booleanUserBuNo){
-                        UserBusiness userBusiness = userBusinessDao.selectUserByUserIdAndBuId(userID, business.getId());
-                        if (userBusiness == null){
-                            userBusinessDao.insertSelective(new UserBusiness(userID,business.getId()));
-                        }
-                    }
-                    if (business == null){
-                        if (enrolResult.length() > 200){
-                            activityLogDao.insertSelective(new ActivityLog(userID,null,filePath,1001,new Date(),enrolResult.substring(0,200)));
-                        }else {
-                            activityLogDao.insertSelective(new ActivityLog(userID,null,filePath,1001,new Date(),enrolResult));
-                        }
-                    }else {
-                        if (enrolResult.length() > 200){
-                            activityLogDao.insertSelective(new ActivityLog(userID,business.getId(),filePath,1001,new Date(),enrolResult.substring(0,200)));
-                        }else {
-                            activityLogDao.insertSelective(new ActivityLog(userID,business.getId(),filePath,1001,new Date(),enrolResult));
-                        }
-                    }
-
                     return enrolResult;
-//                }else {
-//                    return JSONObject.fromObject(passSNR).toString();
-//                }
+                }else {
+                    String s = JSONObject.fromObject(passSNR).toString();
+                    recordEnrolledLog(null, null, filePath, Const.IDENTIFY_ENROL_FAILED, new Date(), s);
+                    return s;
+                }
             }else{
-                return JSONObject.fromObject(ResponseTemplate.error("注册音频命名不规范，请按照要求命名")).toString();
+                String ss = JSONObject.fromObject(ResponseTemplate.error("注册音频命名不规范，请按照要求命名")).toString();
+                recordEnrolledLog(null,null,filePath, Const.IDENTIFY_ENROL_FAILED, new Date(), ss);
+                return ss;
             }
         }else {//下载失败
-            return JSONObject.fromObject(ResponseTemplate.error("路径：“" + filePath + "”的文件下载失败" + stringMap.get("msg"))).toString();
+            String msg = JSONObject.fromObject(ResponseTemplate.error("路径：“" + filePath + "”的文件下载失败" + stringMap.get("msg"))).toString();
+            recordEnrolledLog(null, null, filePath, Const.IDENTIFY_DOWNLOAD_FAILED, new Date(), msg);
+            return msg;
         }
     }
     private String[] getUserArray(String fileName){
@@ -390,9 +384,9 @@ public class EnrolServiceImpl implements IEnrolService {
                         }
                         userBusinessDao.insertSelective(new UserBusiness(newUser.getId(), business.getId()));
                     }
-                    recordVBEnrolledLog(business,newUser.getId(), filePath,Const.VB_ENROL, new Date(),objToStr(responseTemplate));
+                    recordEnrolledLog(business,newUser.getId(), filePath,Const.VB_ENROL, new Date(),objToStr(responseTemplate));
                 }else{
-                    recordVBEnrolledLog(business,null, filePath,Const.VB_ENROL_FAILED, new Date(),objToStr(responseTemplate));
+                    recordEnrolledLog(business,null, filePath,Const.VB_ENROL_FAILED, new Date(),objToStr(responseTemplate));
                 }
                 return responseTemplate;
             }else {
@@ -416,13 +410,13 @@ public class EnrolServiceImpl implements IEnrolService {
                         if (activityLogList.size() >0){
                             //结束
                             ResponseTemplate nowDayEnrolled = ResponseTemplate.error(userNo + "今天已经注册过，不在进行注册流程!");
-                            recordVBEnrolledLog(business, user.getId(), filePath, Const.VB_NOW_DAY_ENROLED, new Date(), objToStr(nowDayEnrolled));
+                            recordEnrolledLog(business, user.getId(), filePath, Const.VB_NOW_DAY_ENROLED, new Date(), objToStr(nowDayEnrolled));
                             return ResponseTemplate.error(userNo + "今天已经注册过，不在进行注册流程!");
                         }else{
                             //1、跟预注册声纹模型进行验证
                             ResponseTemplate responseTemplate = verifySpeaker(logName, userNo + "_2", base64);
                             if ((int)responseTemplate.get("code") == 0){
-                                recordVBEnrolledLog(business, user.getId(), filePath, Const.VB_VERIFY,new Date(), objToStr(responseTemplate));
+                                recordEnrolledLog(business, user.getId(), filePath, Const.VB_VERIFY,new Date(), objToStr(responseTemplate));
                                 if ((boolean)responseTemplate.get("msg") == true){//验证通过
                                     userDao.updateByPrimaryKeySelective(new User(user.getId(),userNo + "_2",1));
                                     return responseTemplate;
@@ -434,14 +428,14 @@ public class EnrolServiceImpl implements IEnrolService {
 
                                         //注册成功更新user状态
                                         userDao.updateByPrimaryKeySelective(new User(user.getId(), 2));
-                                        recordVBEnrolledLog(business, user.getId(),filePath,Const.VB_ENROL,new Date(),ss1);
+                                        recordEnrolledLog(business, user.getId(),filePath,Const.VB_ENROL,new Date(),ss1);
                                     }else {//注册失败
-                                        recordVBEnrolledLog(business, user.getId(),filePath,Const.VB_ENROL_FAILED,new Date(),ss1);
+                                        recordEnrolledLog(business, user.getId(),filePath,Const.VB_ENROL_FAILED,new Date(),ss1);
                                     }
                                     return responseTemplate1;
                                 }
                             }else{
-                                recordVBEnrolledLog(business, user.getId(),filePath, Const.VB_ENROL_FAILED, new Date(), objToStr(responseTemplate));
+                                recordEnrolledLog(business, user.getId(),filePath, Const.VB_ENROL_FAILED, new Date(), objToStr(responseTemplate));
                                 return ResponseTemplate.error(filePath + "注册失败"+ responseTemplate);
                             }
                         }
@@ -453,7 +447,7 @@ public class EnrolServiceImpl implements IEnrolService {
                         ResponseTemplate responseTemplate = verifySpeaker(logName, user.getVerifyNo(), base64);
                         if ((int)responseTemplate.get("code") == 0){
                             //1、添加验证记录
-                            recordVBEnrolledLog(business, user.getId(), filePath, Const.VB_VERIFY, new Date(), objToStr(responseTemplate));
+                            recordEnrolledLog(business, user.getId(), filePath, Const.VB_VERIFY, new Date(), objToStr(responseTemplate));
                             if ((boolean) responseTemplate.get("msg")) {//验证通过
                                 return ResponseTemplate.ok(filePath + "注册成功");
                             }else {//验证不通过,将激活模型设置为验证关注，vpcount=0就是验证关注
@@ -463,7 +457,7 @@ public class EnrolServiceImpl implements IEnrolService {
                                 return responseTemplate;
                             }
                         }else {
-                            recordVBEnrolledLog(business, user.getId(), filePath, Const.VB_ENROL_FAILED, new Date(), objToStr(responseTemplate));
+                            recordEnrolledLog(business, user.getId(), filePath, Const.VB_ENROL_FAILED, new Date(), objToStr(responseTemplate));
                             return ResponseTemplate.error(filePath + "注册失败"+ responseTemplate);
                         }
                     }
@@ -481,7 +475,7 @@ public class EnrolServiceImpl implements IEnrolService {
 
                             if ((int)responseTemplate_22.get("code") == 0) {
                                 //add验证记录表
-                                recordVBEnrolledLog(business, user.getId(), filePath, Const.VB_VERIFY, new Date(), objToStr(responseTemplate_22));
+                                recordEnrolledLog(business, user.getId(), filePath, Const.VB_VERIFY, new Date(), objToStr(responseTemplate_22));
                                 if ((boolean) responseTemplate_22.get("msg") == true) {//验证通过
                                     //将初始状态1设为激活模型
                                     userDao.updateByPrimaryKeySelective(new User(user.getId(),userNo + "_22",1));
@@ -491,7 +485,7 @@ public class EnrolServiceImpl implements IEnrolService {
                                 }
                             }else{
                                 //add验证记录表
-                                recordVBEnrolledLog(business, user.getId(), filePath, Const.VB_VERIFY_FAILED, new Date(), objToStr(responseTemplate_22));
+                                recordEnrolledLog(business, user.getId(), filePath, Const.VB_VERIFY_FAILED, new Date(), objToStr(responseTemplate_22));
                                 return ResponseTemplate.error(filePath + "注册失败"+ responseTemplate_22);
                             }
 
@@ -533,7 +527,7 @@ public class EnrolServiceImpl implements IEnrolService {
                     ResponseTemplate responseTemplate = verifySpeaker(logName, user.getVerifyNo(), base64);
 
                     if ((int)responseTemplate.get("code") == 0) {
-                        recordVBEnrolledLog(business, user.getId(),filePath, Const.VB_VERIFY,new Date(), objToStr(responseTemplate));
+                        recordEnrolledLog(business, user.getId(),filePath, Const.VB_VERIFY,new Date(), objToStr(responseTemplate));
                         if ((boolean) responseTemplate.get("msg")) {//验证通过
                             //将注册关注设为激活模型
                             userDao.updateByPrimaryKeySelective(new User(user.getId(), 1));
@@ -553,17 +547,17 @@ public class EnrolServiceImpl implements IEnrolService {
                             }
                         }
                     }else {
-                        recordVBEnrolledLog(business, user.getId(), filePath, Const.VB_ENROL_FAILED, new Date(), objToStr(responseTemplate));
+                        recordEnrolledLog(business, user.getId(), filePath, Const.VB_ENROL_FAILED, new Date(), objToStr(responseTemplate));
                         return ResponseTemplate.error(filePath + "注册失败"+ responseTemplate);
                     }
                 }else {
                     ResponseTemplate vpCountError = ResponseTemplate.error("声纹模型数量异常");
-                    recordVBEnrolledLog(business, user.getId(), filePath, Const.VB_ENROL_FAILED, new Date(), objToStr(vpCountError));
+                    recordEnrolledLog(business, user.getId(), filePath, Const.VB_ENROL_FAILED, new Date(), objToStr(vpCountError));
                     return vpCountError;
                 }
             }
         }else {//下载失败
-            recordVBEnrolledLog(null, null, filePath, Const.DOWNLOAD_FAILED, new Date(), stringMap.get("msg"));
+            recordEnrolledLog(null, null, filePath, Const.DOWNLOAD_FAILED, new Date(), stringMap.get("msg"));
             return ResponseTemplate.error("路径：“" + filePath + "”的文件下载失败" + stringMap.get("msg"));
         }
     }
@@ -578,7 +572,7 @@ public class EnrolServiceImpl implements IEnrolService {
      * @param result
      * @return
      */
-    private int recordVBEnrolledLog(Business business,Long userId, String voiceLocation, Integer category, Date createDate, String result){
+    private int recordEnrolledLog(Business business,Long userId, String voiceLocation, Integer category, Date createDate, String result){
         int insertSelective;
         if (business == null){
             if (result.length() > 200){
@@ -728,18 +722,21 @@ public class EnrolServiceImpl implements IEnrolService {
      * @return
      */
     private ResponseTemplate isPassSNR(String logName, String userNo, String base64){
-        //得到声纹验证payload
-        String verifyPayload = PayloadUtils.enrolOrVerifyPayload(logName,userNo,base64);
+        //得到声纹注册payload
+        String enrolPayload = PayloadUtils.enrolOrVerifyPayload(logName,userNo,base64);
 
-        //发送post请求,调用声纹引擎验证接口，得到声纹验证结果
-        String verifyResult = PostRequest.sendPost(getUseUrl(verifyUrl),verifyPayload);
-        Map<String,Object> verifyResultMap = JSONObject.fromObject(verifyResult);
+        //发送post请求,调用声纹引擎注册接口，得到声纹注册结果
+        String enrolResult = PostRequest.sendPost(getUseUrl(enrolUrl),enrolPayload);
+        Map<String,Object> enrolResultMap = JSONObject.fromObject(enrolResult);
 
         //返回正确结果
-        if (verifyResultMap.containsKey("result")){
+        if (enrolResultMap.containsKey("result")){
+
+            //调用1vs1删除模型
+            PostRequest.sendPost(getUseUrl(deleteUrl),PayloadUtils.vbDeletePayload(userNo));
 
             //解析verifyResult，得到信噪比值
-            Object o = JSONObject.fromObject(verifyResultMap.get("result")).get("metaInformation");
+            Object o = JSONObject.fromObject(enrolResultMap.get("result")).get("metaInformation");
             JSONArray jsonArray = JSONArray.fromObject(o);
             String resultSnrScore = null;
             for (int i = 0; i<jsonArray.size(); i++){
@@ -752,7 +749,7 @@ public class EnrolServiceImpl implements IEnrolService {
             if (Double.valueOf(resultSnrScore) < Double.valueOf(snrScore)){
                 return ResponseTemplate.error("snr分数过低，snr=" + resultSnrScore);
             }else {
-               return ResponseTemplate.ok(verifyResultMap);
+               return ResponseTemplate.ok(enrolResultMap);
             }
             /*String getVerifyScore = (String) JSONObject.fromObject(verifyResultMap.get("result")).get("score");
             //符合验证得分小于阈值返回false，否则返回true
@@ -761,8 +758,9 @@ public class EnrolServiceImpl implements IEnrolService {
             }else {
                 return ResponseTemplate.ok(false);
             }*/
+
         }else {//返回错误结果
-            return ResponseTemplate.error(verifyResult);
+            return ResponseTemplate.error(enrolResult);
         }
     }
 

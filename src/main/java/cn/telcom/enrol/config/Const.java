@@ -7,7 +7,7 @@ package cn.telcom.enrol.config;
 public class Const {
 
 
-    //文件下载失败
+    //1对1文件下载失败
     public  static  final int DOWNLOAD_FAILED = 0;
 
     //1、1对1注册，
@@ -66,6 +66,10 @@ public class Const {
     public static final int IDENTIFY_DELETE_FAILED = 10060;
     // 10070、1对多查询用户是否存在失败
     public static final int IDENTIFY_IS_EXIST_FAILED = 10070;
+
+
+    //1对多文件下载失败
+    public  static final int IDENTIFY_DOWNLOAD_FAILED = 10000;
 
 
     

@@ -245,10 +245,43 @@ public class PayloadUtils {
 
     }
 
+    public static String vbDeletePayload(String userID){
+        String deletePayload = "{\n" +
+                "  \"serviceData\": {\n" +
+                "    \"loggingId\": \"log-20180104145205104\"\n" +
+                "  },\n" +
+                "  \"userData\": {\n" +
+                "    \"identifier\": \""+ userID +"\"\n" +
+                "  },\n" +
+                "  \"processingInformation\": {\n" +
+                "    \"biometric\": {\n" +
+                "      \"type\": \"text-dependent\",\n" +
+                "      \"mode\": \"td_fuse_16_atn_v2\"\n" +
+                "    },\n" +
+                "    \"audioCharacteristics\": {\n" +
+                "      \"samplingRate\": \"16000\",\n" +
+                "      \"format\": \"pcm16\"\n" +
+                "    },\n" +
+                "    \"metaInformation\": [\n" +
+                "      {\n" +
+                "        \"key\": \"usage-context\",\n" +
+                "        \"value\": {\n" +
+                "          \"value\": \"default\",\n" +
+                "          \"encrypted\": \"false\"\n" +
+                "        }\n" +
+                "      }\n" +
+                "    ]\n" +
+                "  }\n" +
+                "}";
+        return deletePayload;
+    }
+
+
 
 
     public static void main(String[] args) {
-        isSpeakerEnrolledOrDeleteSpeakerPayload("123","123");
+//        isSpeakerEnrolledOrDeleteSpeakerPayload("123","123");
+        System.out.println(vbDeletePayload("123"));
     }
 
 }
