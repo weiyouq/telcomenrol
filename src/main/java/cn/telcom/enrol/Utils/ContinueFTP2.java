@@ -130,6 +130,7 @@ public class ContinueFTP2{
             byte[] bytes = swapStream.toByteArray();
             Map<String,String> map = JSONObject.fromObject(new String(bytes));
             String callerid = map.get("callerid");//手机号
+            String calledid = map.get("calledid");//用户呼叫的手机号，即呼叫的租户号码
 
 
             inJSON.close();
@@ -142,6 +143,7 @@ public class ContinueFTP2{
                 resultMap.put("code","0");
                 resultMap.put("base64", base64);
                 resultMap.put("callerid", callerid);
+                resultMap.put("calledid", calledid);
                 return resultMap;
             }else {
                 resultMap.put("code", "500");

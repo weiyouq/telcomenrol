@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="cn.telcom.enrol.dao.IActivityLogDao">
   <select id="selectAlreadyEnroledList"  resultMap="BaseResultMap">
-    SELECT voice_location FROM t_activity_log
+    SELECT voice_location FROM t_activity_log where category in (1,100) AND DATE_FORMAT(create_date ,'%Y%m%d') = #{date}
   </select>
 
   <insert id="insertByList" parameterType="java.util.List">

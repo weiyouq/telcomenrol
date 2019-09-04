@@ -2,8 +2,11 @@ package cn.telcom.enrol.controller;
 
 import cn.telcom.enrol.Utils.AudioUtils;
 import cn.telcom.enrol.Utils.ContinueFTP2;
+import cn.telcom.enrol.Utils.ShellExcutor;
 import cn.telcom.enrol.service.IEnrolService;
 import net.sf.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
@@ -26,7 +29,7 @@ public class TelcomEnrolController {
 
     @Autowired
     private IEnrolService iEnrolService;
-
+    private Logger logger = LoggerFactory.getLogger(TelcomEnrolController.class);
 
     /**
      * 1对1注册接口
@@ -49,4 +52,12 @@ public class TelcomEnrolController {
     public String identifyService(@RequestBody String path, HttpServletRequest request, HttpServletResponse response) throws IOException {
         return iEnrolService.identifyService(path);
     }
+
+    @RequestMapping("/testhello")
+    @ResponseBody
+    public String test() throws Exception {
+        new ShellExcutor().callScript("/root/Desktop/start.sh");
+        return "123";
+    }
+
 }

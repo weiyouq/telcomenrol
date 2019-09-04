@@ -15,7 +15,7 @@ public interface IActivityLogDao extends IBaseDao<Long, ActivityLog>{
      * 已经注册过的集合
      * @return
      */
-    List<String> selectAlreadyEnroledList();
+    List<String> selectAlreadyEnroledList(String date);
 
     int insertByList(List<ActivityLog> list);
 
