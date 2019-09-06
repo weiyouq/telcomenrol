@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
@@ -56,8 +57,19 @@ public class TelcomEnrolController {
     @RequestMapping("/testhello")
     @ResponseBody
     public String test() throws Exception {
-        new ShellExcutor().callScript("/root/Desktop/start.sh");
+        new ShellExcutor().callScript("/root/Desktop/start.sh",null);
         return "123";
     }
+
+    @RequestMapping("/audiotobase64")
+    @ResponseBody
+    public String base64(@RequestBody String path,HttpServletRequest request, HttpServletResponse response) throws IOException {
+        String base64 = AudioUtils.audioToBase64(path);
+        String base64Path = path.substring(0, path.lastIndexOf(".")) + ".txt";
+        FileWriter fileWriter = new FileWriter(base64Path);
+        fileWriter.write(base64);
+        return "success";
+    }
+
 
 }

@@ -1,9 +1,13 @@
 package cn.telcom.enrol.Utils;
 
 import cn.telcom.enrol.bean.Business;
+import cn.telcom.enrol.config.response.ResponseTemplate;
 import org.springframework.scheduling.config.Task;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Vector;
 
@@ -21,12 +25,21 @@ public class Test {
         return completedThread;
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws FileNotFoundException {
+
+        System.out.println(FileUtils.formateDate("yyyyMMddHHmmssSSS"));
+
+//        InputStream inputStream = new FileInputStream(new File("f:\\1.wav"));
+//        ResponseTemplate responseTemplate = AudioUtils.soxPreprocessingAudio(inputStream);
+//        System.out.println(responseTemplate.get("code"));
+//        System.out.println(responseTemplate.get("msg").toString().substring(0,100));
+
+
 //        String filePath = "/var/ftp/put/1/2/33_44.pcm";
 //        String fileName = filePath.substring(filePath.lastIndexOf("/")+1,filePath.length());
 //        System.out.println(fileName);
-        Business business = new Business();
-        System.out.println(business == null);
+//        Business business = new Business();
+//        System.out.println(business == null);
 
         //        String verifyNo = "222222_2";
 //        if (verifyNo.contains("_")){

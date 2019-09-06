@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
 
@@ -73,7 +74,6 @@ public class EnrolServiceImpl implements IEnrolService {
 
     @Value("${xs.max.thread.count}")
     private int MAX_THREAD_COUNT;
-
     private volatile int completedThread = MAX_THREAD_COUNT;
     private synchronized int getCompletedThreadCount() {
         return completedThread;
@@ -141,7 +141,7 @@ public class EnrolServiceImpl implements IEnrolService {
         Thread thread = new Thread(new Runnable() {
             @Override
             public void run() {
-                Vector<Thread> threadVector = new Vector<>();
+//                Vector<Thread> threadVector = new Vector<>();
                 for (int i = 0; i < MAX_THREAD_COUNT; i++) {
                     Thread threadChildren = new Thread(new Runnable() {
                         @Override
@@ -154,17 +154,17 @@ public class EnrolServiceImpl implements IEnrolService {
                             }
                         }
                     });
-                    threadVector.add(threadChildren);
+//                    threadVector.add(threadChildren);
                     threadChildren.start();
                 }
-                for (Thread thread1 : threadVector){
-                    try {
-                        thread1.join();
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
-                //如果线程数满了，等待
+//                for (Thread thread1 : threadVector){
+//                    try {
+//                        thread1.join();
+//                    } catch (InterruptedException e) {
+//                        e.printStackTrace();
+//                    }
+//                }
+                //如果线程没有全部执行完，等待
                 waitThread();
             }
         });
@@ -228,12 +228,14 @@ public class EnrolServiceImpl implements IEnrolService {
                 return null;
             String item = needToVBEnrolFiles.get(0);
             needToVBEnrolFiles.remove(0);
+            logger.info("当前1:1剩余未注册数量：" + needToVBEnrolFiles.size());
             return item;
         }else {
             if (needToIdentifyEnrolFiles.size() == 0)
                 return null;
             String item = needToIdentifyEnrolFiles.get(0);
             needToIdentifyEnrolFiles.remove(0);
+            logger.info("当前1:N剩余未注册数量：" + needToIdentifyEnrolFiles.size());
             return item;
         }
     }
@@ -356,6 +358,8 @@ public class EnrolServiceImpl implements IEnrolService {
      * @return
      */
     private ResponseTemplate vbEnrolProcessMethod(String filePath) {
+        testFilePath = filePath;
+
         Map<String, String> stringMap = new ContinueFTP2(ftpHostname, ftpUserName, ftpPwd, ftpPort, filePath).run();
         //返回值为0，下载成功
         if (stringMap.get("code").equals("0")){
@@ -422,7 +426,9 @@ public class EnrolServiceImpl implements IEnrolService {
                             //结束
                             ResponseTemplate nowDayEnrolled = ResponseTemplate.error(userNo + "今天已经注册过，不在进行注册流程!");
                             recordEnrolledLog(business, user.getId(), filePath, Const.VB_NOW_DAY_ENROLED, new Date(), objToStr(nowDayEnrolled));
-                            return ResponseTemplate.error(userNo + "今天已经注册过，不在进行注册流程!");
+                            ResponseTemplate responseTemplate = ResponseTemplate.error(userNo + "今天已经注册过，不在进行注册流程!");
+                            logger.info(recordLogger(objToStr(responseTemplate)));
+                            return responseTemplate;
                         }else{
                             //1、跟预注册声纹模型进行验证
                             ResponseTemplate responseTemplate = verifySpeaker(logName, userNo + "_2", base64);
@@ -563,7 +569,9 @@ public class EnrolServiceImpl implements IEnrolService {
                         if ((boolean) responseTemplate.get("msg")) {//验证通过
                             //将注册关注设为激活模型
                             userDao.updateByPrimaryKeySelective(new User(user.getId(), 1));
-                            return ResponseTemplate.ok(filePath + "注册成功");
+                            ResponseTemplate ok = ResponseTemplate.ok(filePath + "注册成功");
+                            logger.info(recordLogger(objToStr(ok)));
+                            return ok;
                         } else {//验证不通过，删除注册关注
                             int i2 = userDao.deleteByPrimaryKey(user.getId());
                             int i1 = 1;
@@ -662,15 +670,28 @@ public class EnrolServiceImpl implements IEnrolService {
     }
 
     /**
-     * 根据userNo，base64进行注册
+     * 1:1根据userNo，base64进行注册
      * @param logName   日志名
      * @param userNo    用户编号
      * @param base64    音频对应base64
      * @return
      */
+
+    private String testFilePath = "";
     private ResponseTemplate enrolSpeaker(String logName, String userNo, String base64){
         //得到声纹注册payload
         String params = PayloadUtils.enrolOrVerifyPayload(logName,userNo,base64);
+
+        //测试，将所有的payload保存到本地
+        try {
+            String replaceAll = testFilePath.replaceAll("/", "_");
+            FileWriter fileWriter = new FileWriter("./temp/base64/enrol/" + replaceAll + ".txt");
+            logger.info("保存enrol文件路径：" + "./temp/base64/enrol/" + replaceAll + ".txt");
+            fileWriter.write(params);
+        } catch (IOException e) {
+            logger.error("保存enrol文件到本地异常：", e);
+        }
+
 
         //发送post请求,调用声纹引擎注册接口，得到声纹注册结果
         String enrolResult = PostRequest.sendPost(getUseUrl(enrolUrl), params);
@@ -711,6 +732,16 @@ public class EnrolServiceImpl implements IEnrolService {
 
         //得到声纹验证payload
         String verifyPayload = PayloadUtils.enrolOrVerifyPayload(logName,userNo,base64);
+
+        //测试，将所有的payload保存到本地
+        try {
+            logger.info("保存verify文件路径：" + "./temp/base64/verify/" + visitConut + ".txt");
+            FileWriter fileWriter = new FileWriter("./temp/base64/verify/" + visitConut + ".txt");
+            fileWriter.write(verifyPayload);
+        } catch (IOException e) {
+            logger.error("保存verify文件到本地异常：", e);
+        }
+
 
         //发送post请求,调用声纹引擎验证接口，得到声纹验证结果
         String verifyResult = PostRequest.sendPost(getUseUrl(verifyUrl),verifyPayload);
@@ -805,6 +836,9 @@ public class EnrolServiceImpl implements IEnrolService {
         }
     }
 
+    /**
+     * 所有线程操作都执行完了，getCompletedThreadCount()才会小于0，也就是说不需要子线程join
+     */
     private void waitThread() {
         while (getCompletedThreadCount() > 0) {
             try {
@@ -819,7 +853,7 @@ public class EnrolServiceImpl implements IEnrolService {
         try {
             ftp2.connect(ftpHostname, Integer.parseInt(ftpPort), ftpUserName,ftpPwd);
 
-            return ftp2.getFileNameListFromFTP(path);
+            return ftp2.getFileNameListFromFTP(path, ftpHostname, Integer.parseInt(ftpPort), ftpUserName,ftpPwd);
         } catch (IOException e) {
             logger.error("连接ftp异常：", e);
             return null;

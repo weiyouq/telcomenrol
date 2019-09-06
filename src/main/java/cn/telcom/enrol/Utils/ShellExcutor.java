@@ -19,7 +19,7 @@ public class ShellExcutor {
     private static Logger log = LoggerFactory.getLogger(ShellExcutor.class);
 
     public static void main(String[] args) throws Exception {
-        new ShellExcutor().callScript("/root/Desktop/start.sh");
+        new ShellExcutor().callScript("/root/Desktop/start.sh", null);
     }
 
 
@@ -43,7 +43,7 @@ public class ShellExcutor {
             log.info("shell path = " + shellPath);
 
             //执行脚本
-            callScript(shellPath);
+            callScript(shellPath, null);
 
         } catch (Exception e) {
             log.error("ShellExcutor异常" + e.getMessage(), e);
@@ -56,9 +56,9 @@ public class ShellExcutor {
      * @param script 脚本文件绝对路径
      * @throws Exception
      */
-    public static void callScript(String script) throws Exception{
+    public static void callScript(String script, String funName) throws Exception{
         try {
-            String cmd = "sh " + script;
+            String cmd = "sh " + script + " " + funName;
 
             //启动独立线程等待process执行完成
             CommandWaitForThread commandThread = new CommandWaitForThread(cmd);

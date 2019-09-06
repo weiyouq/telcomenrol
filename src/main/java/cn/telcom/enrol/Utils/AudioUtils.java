@@ -1,9 +1,13 @@
 package cn.telcom.enrol.Utils;
 
+import cn.telcom.enrol.config.response.ResponseTemplate;
 import com.sun.jna.Memory;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
+import net.sf.json.JSONObject;
 import org.apache.commons.lang.ArrayUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import sun.misc.BASE64Decoder;
 import sun.misc.BASE64Encoder;
 
@@ -16,10 +20,12 @@ import java.util.List;
 
 public class AudioUtils {
 
+	private static Logger logger = LoggerFactory.getLogger(AudioUtils.class);
+
 	public static void main(String[] args) {
-		String s = audioToBase64("f://cms/voice/33_23.pcm");
-		System.out.println(s);
-		Base64toAudio("f://cms//23.pcm.txt", "f://cms//1.wav");
+//		String s = audioToBase64("f://cms/voice/33_23.pcm");
+//		System.out.println(s);
+		Base64toAudio("f://r1.txt", "f://r1.wav");
 	}
 
 	public static String audioToBase64(String inPath) {
@@ -33,6 +39,71 @@ public class AudioUtils {
 		byte[] readAudioData = readFile(inputStream);
 		String byteArrayToBase64 = AudioUtils.byteArrayToBase64(readAudioData);
 		return byteArrayToBase64;
+	}
+
+
+	/**
+	 * 加入sox预处理音频
+	 * @param inputStream
+	 * @param pathAndFileName 文件路径和文件名
+	 * @return
+	 */
+	public static  ResponseTemplate soxPreprocessingAudio(InputStream inputStream, String pathAndFileName){
+
+		logger.info("当前的路径为：" + System.getProperty("user.dir"));//user.dir指定了当前的路径
+		String replaceAll = pathAndFileName.replaceAll("/", "_");
+
+		//临时存放音频文件名、目录
+		String fileName = replaceAll + ".pcm";
+		String path = System.getProperty("user.dir") + "/temp/";
+		String pathAndName = path + fileName;
+		File targetFile = new File(pathAndName);
+		try {
+			//先判断文件是否存在
+			if (!targetFile.exists()){
+				//不存在先创建目录
+				File dir = new File(targetFile.getParent());
+				if(!dir.exists()){
+					boolean mkdirs = dir.mkdirs();
+					if (!mkdirs){
+						logger.error("创建保存文件夹失败");
+						return ResponseTemplate.error("创建保存文件夹失败");
+					}
+				}
+				boolean newFile = targetFile.createNewFile();
+				if (!newFile){
+					logger.error("创建保存文件失败");
+					return ResponseTemplate.error("创建保存文件失败");
+				}
+			}
+			OutputStream outStream = new FileOutputStream(targetFile);
+			byte[] buff = new byte[1024];
+			int rc = 0;
+			while ((rc = inputStream.read(buff, 0, 1024)) > 0) {
+				outStream.write(buff, 0, rc);
+			}
+			if (outStream != null){
+				outStream.close();
+			}
+			try {
+				ShellExcutor.callScript("./SoxPreprocessingAudio.sh", replaceAll);
+			} catch (Exception e) {
+				logger.error("shell脚本执行异常", e);
+				return  ResponseTemplate.error("shell脚本执行异常");
+			}
+			String base64 = audioToBase64(path + replaceAll + ".wav");
+
+			if (targetFile.delete() & new File("./temp/" + replaceAll + ".wav").delete()){
+				logger.info("删除成功" + pathAndName);
+			}else {
+				logger.info("删除失败" + pathAndName);
+			}
+			return ResponseTemplate.ok(base64);
+
+		} catch (IOException e) {
+			logger.error("文件处理异常", e);
+			return  ResponseTemplate.error("文件处理异常");
+		}
 	}
 
 
@@ -92,6 +163,9 @@ public class AudioUtils {
 		}
 		return null;
 	}
+
+
+
 
 	public static Pointer floatArrayToPointer(float[] array) {
 		int floatSize = Native.getNativeSize(float.class);

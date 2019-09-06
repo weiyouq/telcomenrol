@@ -1,5 +1,6 @@
 package cn.telcom.enrol.Utils;
 
+import cn.telcom.enrol.config.response.ResponseTemplate;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import org.apache.commons.net.ftp.*;
@@ -68,18 +69,22 @@ public class ContinueFTP2{
      * @throws IOException
      */
     public boolean connect(String hostname,int port,String username,String password) throws IOException{
+        logger.info("----------开始连接ftp------------");
         ftpClient.connect(hostname, port);
         ftpClient.setControlEncoding("UTF-8");
+
 
         //由于apache不支持中文语言环境，通过定制类解析中文日期类型
 //        ftpClient.configure(new FTPClientConfig("org.apache.commons.net.ftp.parser.UnixFTPEntryParser"));
 
         if(FTPReply.isPositiveCompletion(ftpClient.getReplyCode())){
             if(ftpClient.login(username, password)){
+                logger.info("----------连接ftp成功------------");
                 return true;
             }
         }
         disconnect();
+        logger.info("----------连接ftp失败------------");
         return false;
     }
 
@@ -110,10 +115,19 @@ public class ContinueFTP2{
             //下载文件
             InputStream in= ftpClient.retrieveFileStream(new String(remote.getBytes("UTF-8"),"iso-8859-1"));
 
+
             //得到下载音频的base64
-            String base64 = AudioUtils.pcmToBase64(in);
-
-
+//            String base64 = AudioUtils.pcmToBase64(in);
+            String base64 = "";
+            ResponseTemplate responseTemplate = AudioUtils.soxPreprocessingAudio(in, remote);
+            if ((int)responseTemplate.get("code") == 0){
+                base64 = (String) responseTemplate.get("msg");
+            }else{
+                logger.error("音频："+ remote +"规格不符合要求，转换base64异常");
+                resultMap.put("code", "500");
+                resultMap.put("msg", "音频："+ remote +"规格不符合要求，转换base64异常");
+                return resultMap;
+            }
             in.close();
             boolean base64Result = ftpClient.completePendingCommand();
 
@@ -326,9 +340,65 @@ public class ContinueFTP2{
      * 获取FTP某一特定目录下的所有文件名称
      * @param ftpDirPath    FTP上的目标文件路径
      */
-    public List<String> getFileNameListFromFTP(String ftpDirPath) {
+    public List<String> getFileNameListFromFTP(String ftpDirPath, String ftpHostname, int ftpPort, String ftpUserName, String ftpPwd) {
 
-//        System.out.println("ftpDirPath="+ftpDirPath);
+        logger.info("获取ftp的路劲为："+ftpDirPath);
+        List<String> stringList = new ArrayList<>();
+        try {
+//            logger.info("----------ftpDirPath------" + ftpDirPath + "---" + ftpDirPath.startsWith("/") + ftpDirPath.endsWith("/") + "---" + ftpDirPath.substring(ftpDirPath.length()-1,ftpDirPath.length()) + "---" + ftpDirPath.substring(0,1));
+            if (ftpDirPath.startsWith("/") && ftpDirPath.endsWith("/")) {
+
+                Vector<Thread> threadVector = new Vector<>();
+                // 通过提供的文件路径获取FTPFile对象列表
+                //先调用这个方法,这个方法的意思就是每次数据连接之前，ftp client告诉ftp server开通一个端口来传输数据。
+                //因为ftp server可能每次开启不同的端口来传输数据，但是在linux上，由于安全限制，可能某些端口没有开启，所以就出现阻塞。
+                ftpClient.enterLocalPassiveMode();
+                FTPFile[] files = ftpClient.listFiles(ftpDirPath);
+                // 遍历文件列表，打印出文件名称
+                for (int i = 0; i < files.length; i++) {
+                    FTPFile ftpFile = files[i];
+                    if (!ftpFile.isDirectory()) {
+                        if (ftpFile.getName().endsWith(".down.pcm")) {
+                            stringList.add(ftpDirPath + ftpFile.getName());
+                        }
+                    }else {
+
+                        Thread thread = new Thread(new Runnable() {
+                            @Override
+                            public void run() {
+                                ContinueFTP2 ftp2 = new ContinueFTP2();
+                                try {
+                                    ftp2.connect(ftpHostname, ftpPort, ftpUserName, ftpPwd);
+                                } catch (IOException e) {
+                                    logger.error("ftp连接异常", e);
+                                }
+                                List<String> strings = ftp2.getFtpNames(ftpDirPath + ftpFile.getName() + "/");
+                                stringList.addAll(strings);
+                            }
+                        });
+                        thread.start();
+                        threadVector.add(thread);
+                    }
+                }
+                for (Thread thread : threadVector){
+                        thread.join();
+                }
+            } else {
+                logger.error("当前FTP路径不可用" + ftpDirPath);
+            }
+            return stringList;
+        } catch (IOException e) {
+            logger.error("ftp读取文件异常", e);
+            return null;
+        } catch (InterruptedException e) {
+            logger.error("子线程加入主线程异常", e);
+            return null;
+        }
+    }
+
+    public List<String> getFtpNames(String ftpDirPath) {
+
+        logger.info("获取ftp的路劲为："+ftpDirPath);
         List<String> stringList = new ArrayList<>();
         try {
 //            logger.info("----------ftpDirPath------" + ftpDirPath + "---" + ftpDirPath.startsWith("/") + ftpDirPath.endsWith("/") + "---" + ftpDirPath.substring(ftpDirPath.length()-1,ftpDirPath.length()) + "---" + ftpDirPath.substring(0,1));
@@ -342,13 +412,12 @@ public class ContinueFTP2{
                 // 遍历文件列表，打印出文件名称
                 for (int i = 0; i < files.length; i++) {
                     FTPFile ftpFile = files[i];
-                    // 此处只打印文件，未遍历子目录（如果需要遍历，加上递归逻辑即可）
                     if (!ftpFile.isDirectory()) {
                         if (ftpFile.getName().endsWith(".down.pcm")) {
                             stringList.add(ftpDirPath + ftpFile.getName());
                         }
                     }else {
-                        List<String> strings = getFileNameListFromFTP(ftpDirPath + ftpFile.getName() + "/");
+                        List<String> strings = getFtpNames(ftpDirPath + ftpFile.getName() + "/");
                         stringList.addAll(strings);
                     }
                 }
@@ -357,12 +426,10 @@ public class ContinueFTP2{
             }
             return stringList;
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error("ftp读取文件异常", e);
             return null;
         }
     }
-
-
 
     public static void main(String[] args) {
         ContinueFTP2 ftp2 = new ContinueFTP2();
@@ -371,7 +438,7 @@ public class ContinueFTP2{
         } catch (IOException e) {
             e.printStackTrace();
         }
-        List<String> fileNameListFromFTP = ftp2.getFileNameListFromFTP("/pub/1/");
+        List<String> fileNameListFromFTP = null;//ftp2.getFileNameListFromFTP("/pub/1/");
 
         long l = System.currentTimeMillis();
 
