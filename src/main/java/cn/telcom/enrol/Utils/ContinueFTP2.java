@@ -69,6 +69,7 @@ public class ContinueFTP2{
      * @throws IOException
      */
     public boolean connect(String hostname,int port,String username,String password) throws IOException{
+        long l = System.currentTimeMillis();
         logger.info("----------开始连接ftp------------");
         ftpClient.connect(hostname, port);
         ftpClient.setControlEncoding("UTF-8");
@@ -80,6 +81,7 @@ public class ContinueFTP2{
         if(FTPReply.isPositiveCompletion(ftpClient.getReplyCode())){
             if(ftpClient.login(username, password)){
                 logger.info("----------连接ftp成功------------");
+                logger.info("连接ftp消耗时间为：" + (System.currentTimeMillis() - l));
                 return true;
             }
         }
@@ -111,15 +113,17 @@ public class ContinueFTP2{
                 resultMap.put("msg", DownloadStatus.Remote_File_Noexist.toString());
                 return resultMap;
             }
-
+            long l = System.currentTimeMillis();
             //下载文件
             InputStream in= ftpClient.retrieveFileStream(new String(remote.getBytes("UTF-8"),"iso-8859-1"));
-
+            long l1 = System.currentTimeMillis();
+            logger.info("下载文件消耗时间为（单位毫秒）" + (l1 - l));
 
             //得到下载音频的base64
 //            String base64 = AudioUtils.pcmToBase64(in);
             String base64 = "";
             ResponseTemplate responseTemplate = AudioUtils.soxPreprocessingAudio(in, remote);
+            logger.info("处理音频，并转换base64耗时为：" + (System.currentTimeMillis() - l1));
             if ((int)responseTemplate.get("code") == 0){
                 base64 = (String) responseTemplate.get("msg");
             }else{
@@ -146,11 +150,10 @@ public class ContinueFTP2{
             String callerid = map.get("callerid");//手机号
             String calledid = map.get("calledid");//用户呼叫的手机号，即呼叫的租户号码
 
-
             inJSON.close();
             boolean jsonResult = ftpClient.completePendingCommand();
 
-
+            logger.info("解析完得到base64和用户编号耗时：" + (System.currentTimeMillis() - l1));
             //成功complete则返回base64和手机号
             if(jsonResult && base64Result){
 
@@ -164,7 +167,7 @@ public class ContinueFTP2{
                 resultMap.put("msg", DownloadStatus.Download_New_Failed.toString());
                 return resultMap;
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             logger.error("下载文件路径为："+ remote +"的文件出错",e);
             resultMap.put("code", "500");
             resultMap.put("msg", "下载文件路径为："+ remote +"的文件出错");
@@ -333,6 +336,13 @@ public class ContinueFTP2{
         } catch (IOException e) {
             logger.error("连接FTP出错："+e.getMessage());
             return null;
+        }finally {
+            try {
+                disconnect();
+                logger.info("----------关闭ftp成功------------");
+            } catch (IOException e) {
+                logger.error("关闭ftp连接异常", e);
+            }
         }
     }
 
@@ -366,14 +376,26 @@ public class ContinueFTP2{
                         Thread thread = new Thread(new Runnable() {
                             @Override
                             public void run() {
-                                ContinueFTP2 ftp2 = new ContinueFTP2();
+                                ContinueFTP2 ftp2 = null;
                                 try {
+                                    ftp2 = new ContinueFTP2();
                                     ftp2.connect(ftpHostname, ftpPort, ftpUserName, ftpPwd);
+                                    List<String> strings = ftp2.getFtpNames(ftpDirPath + ftpFile.getName() + "/");
+                                    stringList.addAll(strings);
                                 } catch (IOException e) {
                                     logger.error("ftp连接异常", e);
+                                }finally {
+                                    try {
+                                        if (ftp2 != null){
+                                            ftp2.disconnect();
+                                            logger.info("----------关闭ftp成功------------");
+                                        }
+                                    } catch (IOException e) {
+                                        logger.error("关闭ftp连接异常", e);
+                                    }
+
                                 }
-                                List<String> strings = ftp2.getFtpNames(ftpDirPath + ftpFile.getName() + "/");
-                                stringList.addAll(strings);
+
                             }
                         });
                         thread.start();

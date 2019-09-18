@@ -8,8 +8,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Vector;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiFunction;
 
 /**
  * @author kenny_peng
@@ -17,17 +21,26 @@ import java.util.Vector;
  */
 public class Test {
 
-    private final int MAX_THREAD_COUNT = 18;
+    private static final int MAX_THREAD_COUNT = 6;
 
-    private volatile int completedThread = MAX_THREAD_COUNT;
+    private static volatile int completedThread = MAX_THREAD_COUNT;
 
-    private synchronized int getCompletedThreadCount() {
+    private static List<Integer> needToVBEnrolFiles = new ArrayList<>();
+
+    private static synchronized int getCompletedThreadCount() {
         return completedThread;
     }
 
     public static void main(String[] args) throws FileNotFoundException {
+        needToVBEnrolFiles.clear();
+        for (int i =1; i <4000; i++){
+            needToVBEnrolFiles.add(i);
+        }
 
-        System.out.println(FileUtils.formateDate("yyyyMMddHHmmssSSS"));
+        test();
+
+
+//        System.out.println(FileUtils.formateDate("yyyyMMddHHmmssSSS"));
 
 //        InputStream inputStream = new FileInputStream(new File("f:\\1.wav"));
 //        ResponseTemplate responseTemplate = AudioUtils.soxPreprocessingAudio(inputStream);
@@ -67,10 +80,24 @@ public class Test {
     }
     private volatile int ss =0;
 
-    public void test(){
+    private static synchronized int popAudioItem() {
+        if (needToVBEnrolFiles.size() == 0){
+            return 0;
+        }
+        int item = needToVBEnrolFiles.get(0);
+        needToVBEnrolFiles.remove(0);
+        System.out.println("当前1:1剩余未注册数量：" + needToVBEnrolFiles.size());
+//        String m = "";
+//        System.out.println(needToVBEnrolFiles.size() +"m的值为："+m);
+
+        return item;
+    }
+
+    public static void test(){
         Thread task = new Thread(new Runnable() {
             @Override
             public void run() {
+                Vector<Thread> threadList = new Vector<>();
                 for (int i = 0; i < MAX_THREAD_COUNT; i++) {
                     Thread taskChildren = new Thread(new Runnable() {
                         @Override
@@ -80,14 +107,17 @@ public class Test {
                             doWork();
                         }
                     });
-//                    threadList.add(taskChildren);
+                    threadList.add(taskChildren);
+                    taskChildren.start();
+                }
+                for (Thread thread : threadList){
                     try {
-                        taskChildren.join();
+                        thread.join();
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
-                    taskChildren.start();
                 }
+
                 //如果线程数满了，等待
                 waitThread();
             }
@@ -103,7 +133,7 @@ public class Test {
     }
 
 
-    private void waitThread() {
+    private static void waitThread() {
         while (getCompletedThreadCount() > 0) {
             try {
                 Thread.sleep(100);
@@ -112,13 +142,18 @@ public class Test {
         }
     }
 
-    private synchronized void setCompletedThreadCount(int val) {
+    private static synchronized void setCompletedThreadCount(int val) {
         completedThread = completedThread + val;
     }
     private int m =1000;
-    private void doWork() {
-        while (m-->0) {
-            System.out.println("----mmm-----" + m);
+    private static void doWork() {
+        int m;
+        while ((m=popAudioItem()) != 0) {
+//            System.out.println("----mmm-----" + m);
+            long f =0;
+            for (long s =0; s <199999000l; s++){
+                f+=s;
+            }
         }
         setCompletedThreadCount(-1);//结束循环
     }

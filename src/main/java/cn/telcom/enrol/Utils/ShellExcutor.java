@@ -65,13 +65,13 @@ public class ShellExcutor {
             commandThread.start();
 
             while (!commandThread.isFinish()) {
-                log.info("shell " + script + " 还未执行完毕,10s后重新探测");
-                Thread.sleep(10000);
+                log.info("shell " + script + " 还未执行完毕,1s后重新探测");
+                Thread.sleep(1000);
             }
 
             //检查脚本执行结果状态码
             if(commandThread.getExitValue() != 0){
-                throw new Exception("shell " + script + "执行失败,exitValue = " + commandThread.getExitValue());
+                log.error("shell " + script + "执行失败,exitValue = " + commandThread.getExitValue());
             }
             log.info("shell " + script + "执行成功,exitValue = " + commandThread.getExitValue());
         }
@@ -88,11 +88,14 @@ public class ShellExcutor {
         private String cmd;
         private boolean finish = false;
         private int exitValue = -1;
+        public static final int DEFAULT_TIMEOUT = 10 * 1000;
+        public static final int DEFAULT_INTERVAL = 1000;
 
         public CommandWaitForThread(String cmd) {
             this.cmd = cmd;
         }
 
+        @Override
         public void run(){
             try {
                 //执行脚本并等待脚本执行完成
@@ -111,8 +114,30 @@ public class ShellExcutor {
                 infoInput.close();
                 errorInput.close();
 
-                //阻塞执行线程直至脚本执行完成后返回
-                this.exitValue = process.waitFor();
+//                //阻塞执行线程直至脚本执行完成后返回
+//                this.exitValue = process.waitFor();
+
+                //timeout control
+                long start = System.currentTimeMillis();
+
+                while (System.currentTimeMillis() - start < DEFAULT_TIMEOUT && !finish) {
+                    finish = true;
+                    try {
+                        //阻塞执行线程直至脚本执行完成后返回
+                        this.exitValue = process.waitFor();
+                    } catch (IllegalThreadStateException e) {
+                        // process hasn't finished yet
+                        finish = false;
+
+                        try {
+                            Thread.sleep(DEFAULT_INTERVAL);
+                        } catch (InterruptedException e1) {
+                            log.error("Process, failed" + e.getMessage() + "]", e);
+                        }
+                    }
+                }
+
+
             } catch (Throwable e) {
                 log.error("CommandWaitForThread accure exception,shell " + cmd, e);
                 exitValue = 110;

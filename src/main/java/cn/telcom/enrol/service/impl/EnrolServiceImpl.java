@@ -7,31 +7,31 @@ import cn.telcom.enrol.config.Const;
 import cn.telcom.enrol.config.response.ResponseTemplate;
 import cn.telcom.enrol.dao.*;
 import cn.telcom.enrol.service.IEnrolService;
+import com.sun.corba.se.pept.encoding.InputObject;
+import com.sun.corba.se.pept.encoding.OutputObject;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
-import org.apache.commons.collections.bag.SynchronizedSortedBag;
-import org.apache.commons.net.ftp.FTPClientConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.*;
+import java.util.concurrent.*;
 
 /**
  * @author kenny_peng
  * @created 2019/7/25 10:41
  */
 @Service
-@SuppressWarnings("unchecked")
+@Scope("prototype")
 public class EnrolServiceImpl implements IEnrolService {
 
     private int visitConut = 0;
-
     @Value("${voice.save.location.1vs1}")
     private String voiceSaveLocation;//1vs1音频保存位置
 
@@ -58,28 +58,33 @@ public class EnrolServiceImpl implements IEnrolService {
     private String ftpUserName;
     @Value("${xs.yugao.ftp.password}")
     private String ftpPwd;
-
     /**
      * 均衡url
      * @param url   传入请求url
      * @return
      */
-    private String getUseUrl(String url){
+    private synchronized String getUseUrl(String url){
         String[] urls = url.split(",");
         visitConut++;
         int num = visitConut%urls.length;
         return urls[num];
 
     }
-
     @Value("${xs.max.thread.count}")
     private int MAX_THREAD_COUNT;
-    private volatile int completedThread = MAX_THREAD_COUNT;
-    private synchronized int getCompletedThreadCount() {
-        return completedThread;
+    private volatile int vbCompletedThread = MAX_THREAD_COUNT;
+    private volatile int identifyCompletedThread = MAX_THREAD_COUNT;
+    private synchronized int getVbCompletedThreadCount() {
+        return vbCompletedThread;
     }
-    private synchronized void setCompletedThreadCount(int val) {
-        completedThread = completedThread + val;
+    private synchronized void setVbCompletedThreadCount(int val) {
+        vbCompletedThread = vbCompletedThread + val;
+    }
+    public synchronized int getIdentifyCompletedThread() {
+        return identifyCompletedThread;
+    }
+    public synchronized void setIdentifyCompletedThread(int identifyCompletedThread) {
+        this.identifyCompletedThread = identifyCompletedThread;
     }
 
     private List<String> needToVBEnrolFiles = new ArrayList<>();//一对一需要注册的音频路径
@@ -95,6 +100,78 @@ public class EnrolServiceImpl implements IEnrolService {
     private IActivityLogDao activityLogDao;
     private Logger logger = LoggerFactory.getLogger(EnrolServiceImpl.class);
 
+    //异步执行器
+    private BlockingQueue<Runnable> blockingQueue = new ArrayBlockingQueue<Runnable>(10);
+    //线程池参数设定
+    private ThreadPoolExecutor taskExecutor = new ThreadPoolExecutor(20, 50, 1, TimeUnit.MINUTES, blockingQueue);
+    //异步执行线程工作实例
+    class TaskCallable implements Callable<ResponseTemplate> {
+        public TaskCallable() {
+            super();
+        }
+        public TaskCallable(InputObject inputObject) {
+            super();
+            this.inputObject = inputObject;
+        }
+        private InputObject inputObject;
+        private OutputObject outputObject;
+        public InputObject getInputObject() {
+            return inputObject;
+        }
+        public void setInputObject(InputObject inputObject) {
+            this.inputObject = inputObject;
+        }
+        public OutputObject getOutputObject() {
+            return outputObject;
+        }
+        public void setOutputObject(OutputObject outputObject) {
+            this.outputObject = outputObject;
+        }
+
+        //调用任务执行核心方法
+        @Override
+        public ResponseTemplate call() throws Exception {
+            ResponseTemplate returnObject = execute();
+//			String rtnMsg = (String) returnObject.getReturnMessage();
+//			String rtnCode = (String) returnObject.getReturnCode();
+            //执行修改返回日志操作
+
+            return returnObject;
+        }
+    }
+
+    private ResponseTemplate execute() {
+//        String serviceName = inputObject.getServiceName();
+        String methodName = "vbEnrol";//inputObject.getMethod();
+
+        //1、返回调度成功
+//        OutputObject returnObject = new OutputObject();
+//        returnObject.setReturnCode("0");
+//        returnObject.setReturnMessage("调度到达服务端");
+
+        //2、调用后台服务
+        try {
+            Object object = this;
+            logger.info("-----------------启动联测----------------");
+            Method method = object.getClass().getMethod(methodName);
+            logger.info("------------------准备方法-----------------------");
+            method.invoke(object);
+            logger.info("------------------结束联测-----------------------");
+            return ResponseTemplate.ok("异步服务调用结束");
+        } catch (Exception e) {
+            logger.error("调用服务失败，" + "methodName =" + methodName, e);
+            return ResponseTemplate.error("异步调用服务异常");
+        }
+    }
+
+    /**
+     * 异步提交执行线程
+     */
+    private void taskSubmit(){
+        TaskCallable taskCallable = new TaskCallable();
+        taskExecutor.submit(taskCallable);
+    }
+
     /**
      * 1vs1 声纹注册，
      * 1、先读取数据库t_1vs1_enrol表，查找注册状态为0的信息，（每次多少条）
@@ -103,6 +180,11 @@ public class EnrolServiceImpl implements IEnrolService {
      */
     @Override
     public String toEnrolSpeaker() {
+        this.taskSubmit();
+        return objToStr(ResponseTemplate.ok("异步执行完成"));
+    }
+
+    public String vbEnrol(){
         needToVBEnrolFiles.clear();
         //1、根据音频存储路径，获取所有音频文件
         String date = FileUtils.formateDate("yyyyMMdd");
@@ -128,6 +210,7 @@ public class EnrolServiceImpl implements IEnrolService {
         return JSONArray.fromObject(resultList).toString();
     }
 
+
     /**
      * //多线程启动注册
      * @param resultList    返回集合
@@ -141,7 +224,7 @@ public class EnrolServiceImpl implements IEnrolService {
         Thread thread = new Thread(new Runnable() {
             @Override
             public void run() {
-//                Vector<Thread> threadVector = new Vector<>();
+                Vector<Thread> threadVector = new Vector<>();
                 for (int i = 0; i < MAX_THREAD_COUNT; i++) {
                     Thread threadChildren = new Thread(new Runnable() {
                         @Override
@@ -154,18 +237,22 @@ public class EnrolServiceImpl implements IEnrolService {
                             }
                         }
                     });
-//                    threadVector.add(threadChildren);
+                    threadVector.add(threadChildren);
                     threadChildren.start();
                 }
-//                for (Thread thread1 : threadVector){
-//                    try {
-//                        thread1.join();
-//                    } catch (InterruptedException e) {
-//                        e.printStackTrace();
-//                    }
-//                }
+                for (Thread thread1 : threadVector){
+                    try {
+                        thread1.join();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
                 //如果线程没有全部执行完，等待
-                waitThread();
+                if (taskName == 0){
+                    waitThread(0);
+                }else {
+                    waitThread(1);
+                }
             }
         });
         thread.start();
@@ -190,10 +277,12 @@ public class EnrolServiceImpl implements IEnrolService {
     private void doVbEnrollWork(List<ResponseTemplate> resultList) {
         String filePath = null;
         while ((filePath=popAudioItem(0)) != null) {
+            long l = System.currentTimeMillis();
             ResponseTemplate responseTemplate = vbEnrolProcessMethod(filePath);
+            logger.info("注册完成一个音频耗时：" + (System.currentTimeMillis() - l));
             resultList.add(responseTemplate);
         }
-        setCompletedThreadCount(-1);//结束循环用
+        setVbCompletedThreadCount(-1);//结束循环用
     }
 
     /**
@@ -215,7 +304,7 @@ public class EnrolServiceImpl implements IEnrolService {
                 error.add(filePath + enrolResult);
             }
         }
-        setCompletedThreadCount(-1);//结束循环用
+        setIdentifyCompletedThread(-1);//结束循环用
     }
 
     /**
@@ -224,8 +313,9 @@ public class EnrolServiceImpl implements IEnrolService {
      */
     private synchronized String popAudioItem(int taskName) {
         if (taskName == 0 ){
-            if (needToVBEnrolFiles.size() == 0)
+            if (needToVBEnrolFiles.size() == 0){
                 return null;
+            }
             String item = needToVBEnrolFiles.get(0);
             needToVBEnrolFiles.remove(0);
             logger.info("当前1:1剩余未注册数量：" + needToVBEnrolFiles.size());
@@ -358,9 +448,13 @@ public class EnrolServiceImpl implements IEnrolService {
      * @return
      */
     private ResponseTemplate vbEnrolProcessMethod(String filePath) {
-        testFilePath = filePath;
-
+//        Map<String, String> stringMap;
+//        try {
         Map<String, String> stringMap = new ContinueFTP2(ftpHostname, ftpUserName, ftpPwd, ftpPort, filePath).run();
+//        } catch (Exception e) {
+//            logger.error("转base64异常", e);
+//            return ResponseTemplate.error("音频下载异常");
+//        }
         //返回值为0，下载成功
         if (stringMap.get("code").equals("0")){
             String base64 = stringMap.get("base64");
@@ -402,7 +496,7 @@ public class EnrolServiceImpl implements IEnrolService {
                 }else{
                     recordEnrolledLog(business,null, filePath,Const.VB_ENROL_FAILED, new Date(),objToStrString);
                 }
-                logger.info(recordLogger(filePath + objToStrString));
+                logger.info(recordLogger("预注册成功"+filePath + objToStrString));
                 return responseTemplate;
             }else {
                 //添加用户租户关系
@@ -478,9 +572,15 @@ public class EnrolServiceImpl implements IEnrolService {
                             }else {//验证不通过,将激活模型设置为验证关注，vpcount=0就是验证关注
 
                                 //将激活模型设置为验证关注
-                                userDao.updateByPrimaryKeySelective(new User(user.getId(), 0));
-                                logger.info(recordLogger(toStrs));
-                                return responseTemplate;
+                                int i = userDao.updateByPrimaryKeySelective(new User(user.getId(), 0));
+                                ResponseTemplate result;
+                                if (i >0){
+                                    result = ResponseTemplate.ok("验证不通过，将激活模型设置为验证关注成功");
+                                }else {
+                                    result = ResponseTemplate.error("验证不通过，将激活模型设置为验证关注失败");
+                                }
+                                logger.info(recordLogger(objToStr(result)));
+                                return result;
                             }
                         }else {
                             recordEnrolledLog(business, user.getId(), filePath, Const.VB_ENROL_FAILED, new Date(), toStrs);
@@ -677,27 +777,25 @@ public class EnrolServiceImpl implements IEnrolService {
      * @return
      */
 
-    private String testFilePath = "";
     private ResponseTemplate enrolSpeaker(String logName, String userNo, String base64){
         //得到声纹注册payload
         String params = PayloadUtils.enrolOrVerifyPayload(logName,userNo,base64);
 
-        //测试，将所有的payload保存到本地
+       /* //测试，将所有的payload保存到本地
         try {
-            String replaceAll = testFilePath.replaceAll("/", "_");
-            FileWriter fileWriter = new FileWriter("./temp/base64/enrol/" + replaceAll + ".txt");
-            logger.info("保存enrol文件路径：" + "./temp/base64/enrol/" + replaceAll + ".txt");
+            FileWriter fileWriter = new FileWriter("./temp/base64/enrol/" + visitConut + ".txt");
+            logger.info("保存enrol文件路径：" + "./temp/base64/enrol/" + visitConut + ".txt");
             fileWriter.write(params);
         } catch (IOException e) {
             logger.error("保存enrol文件到本地异常：", e);
-        }
+        }*/
 
 
         //发送post请求,调用声纹引擎注册接口，得到声纹注册结果
         String enrolResult = PostRequest.sendPost(getUseUrl(enrolUrl), params);
         Map<String, Object> enrolResultMap = JSONObject.fromObject(enrolResult);
         //返回正确结果
-        if (enrolResultMap.containsKey("result")){
+        if (enrolResultMap.containsKey("result") && !enrolResultMap.containsKey("errorData")){
 
             //解析verifyResult，得到信噪比值
             Object o = JSONObject.fromObject(enrolResultMap.get("result")).get("metaInformation");
@@ -733,15 +831,14 @@ public class EnrolServiceImpl implements IEnrolService {
         //得到声纹验证payload
         String verifyPayload = PayloadUtils.enrolOrVerifyPayload(logName,userNo,base64);
 
-        //测试，将所有的payload保存到本地
+        /*//测试，将所有的payload保存到本地
         try {
             logger.info("保存verify文件路径：" + "./temp/base64/verify/" + visitConut + ".txt");
             FileWriter fileWriter = new FileWriter("./temp/base64/verify/" + visitConut + ".txt");
             fileWriter.write(verifyPayload);
         } catch (IOException e) {
             logger.error("保存verify文件到本地异常：", e);
-        }
-
+        }*/
 
         //发送post请求,调用声纹引擎验证接口，得到声纹验证结果
         String verifyResult = PostRequest.sendPost(getUseUrl(verifyUrl),verifyPayload);
@@ -795,17 +892,18 @@ public class EnrolServiceImpl implements IEnrolService {
      */
     private ResponseTemplate isPassSNR(String logName, String userNo, String base64){
         //得到声纹注册payload
-        String enrolPayload = PayloadUtils.enrolOrVerifyPayload(logName,userNo,base64);
+        String userToEnrolNo = userNo + "_ispasssnr";
+        String enrolPayload = PayloadUtils.enrolOrVerifyPayload(logName,userToEnrolNo,base64);
 
         //发送post请求,调用声纹引擎注册接口，得到声纹注册结果
         String enrolResult = PostRequest.sendPost(getUseUrl(enrolUrl),enrolPayload);
         Map<String,Object> enrolResultMap = JSONObject.fromObject(enrolResult);
 
         //返回正确结果
-        if (enrolResultMap.containsKey("result")){
+        if (enrolResultMap.containsKey("result") && !enrolResultMap.containsKey("errorData")){
 
             //调用1vs1删除模型
-            PostRequest.sendPost(getUseUrl(deleteUrl),PayloadUtils.vbDeletePayload(userNo));
+            PostRequest.sendPost(getUseUrl(deleteUrl),PayloadUtils.vbDeletePayload(userToEnrolNo));
 
             //解析verifyResult，得到信噪比值
             Object o = JSONObject.fromObject(enrolResultMap.get("result")).get("metaInformation");
@@ -839,11 +937,22 @@ public class EnrolServiceImpl implements IEnrolService {
     /**
      * 所有线程操作都执行完了，getCompletedThreadCount()才会小于0，也就是说不需要子线程join
      */
-    private void waitThread() {
-        while (getCompletedThreadCount() > 0) {
-            try {
-                Thread.sleep(1000);
-            } catch (Exception e) {
+    private void waitThread(int category) {
+        if (category == 0){
+            while (getVbCompletedThreadCount() > 0) {
+                try {
+                    Thread.sleep(10000);
+                } catch (Exception e) {
+                    logger.error("线程等待异常", e);
+                }
+            }
+        }else {
+            while (getIdentifyCompletedThread() > 0) {
+                try {
+                    Thread.sleep(10000);
+                } catch (Exception e) {
+                    logger.error("线程等待异常", e);
+                }
             }
         }
     }
@@ -857,6 +966,13 @@ public class EnrolServiceImpl implements IEnrolService {
         } catch (IOException e) {
             logger.error("连接ftp异常：", e);
             return null;
+        }finally {
+            try {
+                ftp2.disconnect();
+                logger.info("----------关闭ftp成功------------");
+            } catch (IOException e) {
+                logger.error("关闭ftp异常", e);
+            }
         }
     }
 

@@ -23,9 +23,9 @@ public class AudioUtils {
 	private static Logger logger = LoggerFactory.getLogger(AudioUtils.class);
 
 	public static void main(String[] args) {
-//		String s = audioToBase64("f://cms/voice/33_23.pcm");
-//		System.out.println(s);
-		Base64toAudio("f://r1.txt", "f://r1.wav");
+		String s = audioToBase64("C:\\Users\\Administrator\\Desktop\\zyf-registry(1).wav");
+		System.out.println(s);
+//		Base64toAudio("C:\\Users\\Administrator\\Desktop\\3.txt", "C:\\Users\\Administrator\\Desktop\\3.wav");
 	}
 
 	public static String audioToBase64(String inPath) {
@@ -50,14 +50,16 @@ public class AudioUtils {
 	 */
 	public static  ResponseTemplate soxPreprocessingAudio(InputStream inputStream, String pathAndFileName){
 
-		logger.info("当前的路径为：" + System.getProperty("user.dir"));//user.dir指定了当前的路径
+//		logger.info("当前的路径为：" + System.getProperty("user.dir"));//user.dir指定了当前的路径
 		String replaceAll = pathAndFileName.replaceAll("/", "_");
 
 		//临时存放音频文件名、目录
 		String fileName = replaceAll + ".pcm";
 		String path = System.getProperty("user.dir") + "/temp/";
 		String pathAndName = path + fileName;
+		logger.info("待处理音频文件路径为：" + pathAndName);
 		File targetFile = new File(pathAndName);
+
 		try {
 			//先判断文件是否存在
 			if (!targetFile.exists()){
