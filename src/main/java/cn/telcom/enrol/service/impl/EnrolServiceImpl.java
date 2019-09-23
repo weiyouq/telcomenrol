@@ -328,7 +328,6 @@ public class EnrolServiceImpl implements IEnrolService {
             return item;
         }
     }
-
     /**
      * 1对多声纹注册
      * @return
