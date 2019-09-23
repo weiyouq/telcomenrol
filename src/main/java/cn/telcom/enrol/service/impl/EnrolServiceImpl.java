@@ -210,7 +210,6 @@ public class EnrolServiceImpl implements IEnrolService {
         return JSONArray.fromObject(resultList).toString();
     }
 
-
     /**
      * //多线程启动注册
      * @param resultList    返回集合

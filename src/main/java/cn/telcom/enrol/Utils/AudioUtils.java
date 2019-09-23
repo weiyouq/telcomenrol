@@ -23,9 +23,9 @@ public class AudioUtils {
 	private static Logger logger = LoggerFactory.getLogger(AudioUtils.class);
 
 	public static void main(String[] args) {
-		String s = audioToBase64("C:\\Users\\Administrator\\Desktop\\zyf-registry(1).wav");
-		System.out.println(s);
-//		Base64toAudio("C:\\Users\\Administrator\\Desktop\\3.txt", "C:\\Users\\Administrator\\Desktop\\3.wav");
+//		String s = audioToBase64("C:\\Users\\Administrator\\Desktop\\zyf-registry(1).wav");
+//		System.out.println(s);
+		Base64toAudio("C:\\Users\\Administrator\\Desktop\\4.txt", "C:\\Users\\Administrator\\Desktop\\3.wav");
 	}
 
 	public static String audioToBase64(String inPath) {
